@@ -1,6 +1,6 @@
 <!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tera3 Burndown Dashboard - SharePoint History V15</title><style>
 :root{--bg:#f5f5f5;--panel:#ffffff;--text:#141414;--muted:#737373;--line:#e5e7eb;--green:#16a34a;--green2:#22c55e;--blue:#2563eb;--red:#dc2626;--orange:#f97316;}
-html,body{height:100%;margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+html,body{height:100%;margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)} body.sec-pending .wrap{display:none !important} body.sec-allowed .wrap{display:grid !important} body.sec-blocked .wrap{display:none !important}
 .wrap{max-width:1720px;height:100%;box-sizing:border-box;margin:0 auto;padding:14px 18px;display:grid;grid-template-rows:auto auto 1fr;gap:10px}
 .hero{background:linear-gradient(135deg,#111111 0%,#2b2b2b 55%,#111111 100%);color:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 4px 16px rgba(0,0,0,.10)}
 .hero h1{margin:0;font-size:24px;letter-spacing:.15px}.hero .accent{color:#93c5fd}.subtitle{color:#d4d4d4;margin-top:4px;font-size:13px}
@@ -21,53 +21,73 @@ input.num{width:58px;padding:4px 4px;border:1px solid #d6d6d6;border-radius:5px;
 .msg{padding:6px 8px;border-radius:8px;display:inline-block;font-size:12px}.msg.ok{background:#ecfdf5;border:1px solid #86efac;color:#166534}.msg.err{background:#fef2f2;border:1px solid #fca5a5;color:#991b1b}
 @media (max-width:1400px){body{overflow:auto} .wrap{height:auto;min-height:100vh} .grid2{grid-template-columns:1fr} .table-wrap{overflow:auto} table{min-width:460px}}
 .security-block{max-width:760px;margin:48px auto;padding:24px;border:1px solid var(--line);border-radius:14px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-.security-block h2{margin:0 0 10px 0;font-size:24px}.security-block p{margin:6px 0;color:#444;font-size:14px;line-height:1.5}
-.security-block code{background:#f5f5f5;padding:2px 6px;border-radius:6px}
-</style></head><body>
-<script>
+.security-block h2{margin:0 0 10px 0;font-size:24px}.security-block p{margin:6px 0;color:#444;font-size:14px;line-height:1.5}.security-block code{background:#f5f5f5;padding:2px 6px;border-radius:6px}
+</style><script>
 (function(){
   'use strict';
-  var CONFIG = {
+  window.__SECURITY_CONFIG__ = {
     allowedReferrers: ['sharepoint.com','teradynecom.sharepoint.com'],
-    validToken: 'jeffersonxuinteradyne',
-    sharePointFallbackUrl: ''
+    validToken: 'REPLACE_WITH_YOUR_PRIVATE_TOKEN',
+    sharePointFallbackUrl: '',
+    allowDirectWithTokenForPreview: false
   };
 
   function showBlocked(title, message){
-    document.body.innerHTML =
+    document.body.classList.remove('sec-pending','sec-allowed');
+    document.body.classList.add('sec-blocked');
+    document.body.insertAdjacentHTML('afterbegin',
       '<div class="security-block">' +
       '<h2>' + title + '</h2>' +
       '<p>' + message + '</p>' +
       '<p>Open this dashboard from the approved SharePoint page.</p>' +
       '<p>If you maintain this page, update <code>validToken</code> and the SharePoint iframe URL token together.</p>' +
-      '</div>';
+      '</div>'
+    );
   }
 
-  var ref = (document.referrer || '').toLowerCase();
-  var refAllowed = CONFIG.allowedReferrers.some(function(domain){ return ref.indexOf(domain) > -1; });
+  function allowPage(){
+    document.body.classList.remove('sec-pending','sec-blocked');
+    document.body.classList.add('sec-allowed');
+  }
 
-  if(!refAllowed){
-    if(CONFIG.sharePointFallbackUrl){
-      window.location.replace(CONFIG.sharePointFallbackUrl);
-      throw new Error('Blocked: invalid referrer, redirected to SharePoint.');
+  function runChecks(){
+    var CONFIG = window.__SECURITY_CONFIG__;
+    var ref = (document.referrer || '').toLowerCase();
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get('access');
+    var hasValidToken = token === CONFIG.validToken;
+    var refAllowed = CONFIG.allowedReferrers.some(function(domain){ return ref.indexOf(domain) > -1; });
+
+    if (CONFIG.allowDirectWithTokenForPreview && hasValidToken) {
+      allowPage();
+      return;
     }
-    showBlocked('Access Denied', 'This dashboard must be opened from SharePoint.');
-    throw new Error('Blocked: invalid referrer.');
+
+    if(!refAllowed){
+      if(CONFIG.sharePointFallbackUrl){
+        window.location.replace(CONFIG.sharePointFallbackUrl);
+        return;
+      }
+      showBlocked('Access Denied', 'This dashboard must be opened from SharePoint.');
+      return;
+    }
+
+    if(!hasValidToken){
+      if(CONFIG.sharePointFallbackUrl){
+        window.location.replace(CONFIG.sharePointFallbackUrl);
+        return;
+      }
+      showBlocked('Unauthorized', 'Missing or invalid access token.');
+      return;
+    }
+
+    allowPage();
   }
 
-  var params = new URLSearchParams(window.location.search);
-  var token = params.get('access');
-  if(token !== CONFIG.validToken){
-    if(CONFIG.sharePointFallbackUrl){
-      window.location.replace(CONFIG.sharePointFallbackUrl);
-      throw new Error('Blocked: invalid token, redirected to SharePoint.');
-    }
-    showBlocked('Unauthorized', 'Missing or invalid access token.');
-    throw new Error('Blocked: invalid token.');
-  }
+  document.addEventListener('DOMContentLoaded', runChecks);
 })();
 </script>
-
+</head><body class="sec-pending">
 <div class='wrap'>
 <div class='hero'><h1>Tera3 Burndown Dashboard <span class='accent'>Vertical Quarter Table</span></h1><div class='subtitle'>Chart enlarged to better fill the left panel, the table has visible vertical scroll, and the dashboard now loads from / saves to SharePoint through Flow A / Flow B and lists SharePoint snapshot history through Flow C.</div></div>
 <div class='cards'><div class='card'><div class='label'>Latest Snapshot</div><div class='value'>2026-05-26</div></div><div class='card'><div class='label'>Beginning Supply</div><div class='value'><input id='bohInput' class='num' type='number' step='any' value='4450.0' style='width:90px;font-size:16px;font-weight:700;'></div></div><div class='card emphasis'><div class='label'>2026Q1 Demand</div><div class='value' id='kpiQ1'>749</div></div><div class='card emphasis'><div class='label'>2026Q2 Supply Start</div><div class='value' id='kpiQ2'>3,701</div></div><div class='card emphasis'><div class='label'>First Negative Quarter</div><div class='value' id='kpiStockout'>2027Q4</div></div><div class='card'><div class='label'>Active Snapshot</div><div class='value codeish' id='kpiActive'>baseline</div></div><div class='card'><div class='label'>JS / SharePoint</div><div class='value codeish' id='kpiJs'>loading...</div></div></div>
