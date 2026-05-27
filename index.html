@@ -84,6 +84,8 @@ input.num{width:58px;padding:4px 4px;border:1px solid #d6d6d6;border-radius:5px;
     allowPage();
   }
 
+  
+
   document.addEventListener('DOMContentLoaded', runChecks);
 })();
 </script>
@@ -142,6 +144,39 @@ function downloadJson(obj, filename){ var blob=new Blob([JSON.stringify(obj,null
 function exportSnapshotsJson(){ downloadJson({exportedAt:stamp(), snapshots:snapshots}, 'tera3_burndown_snapshots.json'); setStatus('All snapshots JSON exported.', 'ok'); }
 function downloadCurrentSnapshot(){ downloadJson({exportedAt:stamp(), boh:num(beginningSupply), products:products, summary:computeSummary()}, 'tera3_burndown_current_snapshot.json'); setStatus('Current snapshot JSON downloaded.', 'ok'); }
 function importSnapshotsJson(file){ var reader=new FileReader(); reader.onload=function(e){ try{ var payload=JSON.parse(e.target.result); snapshots=Array.isArray(payload.snapshots)?payload.snapshots:[]; saveSnapshots(); activeSnapshotId='baseline'; populateSnapshotSelect(); setStatus('Snapshots imported.', 'ok'); } catch(err){ setStatus('Import failed: invalid JSON file.', 'err'); } }; reader.readAsText(file); }
+
+function buildDetailCsv(products, quarters, boh, chartMode){
+  var rows = [];
+
+  // header
+  rows.push(['Product'].concat(quarters));
+
+  // product rows
+  for (var i = 0; i < products.length; i++) {
+    var row = [products[i].Product];
+    for (var q = 0; q < quarters.length; q++) {
+      row.push(products[i][quarters[q]]);
+    }
+    rows.push(row);
+  }
+
+  // optional metadata rows
+  rows.push([]);
+  rows.push(['BOH', boh]);
+  rows.push(['ChartMode', chartMode]);
+
+  return rows.map(function(r){
+    return r.map(function(v){
+      if (v === null || typeof v === 'undefined') return '';
+      var s = String(v);
+      if (s.indexOf(',') > -1 || s.indexOf('"') > -1 || s.indexOf('\n') > -1) {
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }).join(',');
+  }).join('\n');
+}
+
 function exportCurrentCsv(){ var csv = buildDetailCsv(products, quarters, num(beginningSupply), chartMode); var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}); var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='tera3_burndown_current_snapshot_detail.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); setStatus('Current detail CSV exported.', 'ok'); }
 function toggleChartMode(){ chartMode = chartMode==='expanded' ? 'compact' : 'expanded'; rerender(); }
 function init(){ snapshots=loadSnapshots(); renderProductTableVertical(); rerender(); populateSnapshotSelect(); setStatus('Initializing dashboard...', 'ok'); $('bohInput').addEventListener('input', function(e){ beginningSupply=num(e.target.value); rerender(); }); $('saveSnapshotBtn').addEventListener('click', saveSnapshot); $('downloadCurrentSnapshotBtn').addEventListener('click', downloadCurrentSnapshot); $('snapshotSelect').addEventListener('change', function(e){ loadSnapshot(e.target.value); }); $('deleteSnapshotBtn').addEventListener('click', deleteSelectedSnapshot); $('resetBtn').addEventListener('click', function(){ loadSnapshot('baseline'); }); $('exportCurrentBtn').addEventListener('click', exportCurrentCsv); $('exportSnapshotsBtn').addEventListener('click', exportSnapshotsJson); $('importSnapshotsBtn').addEventListener('click', function(){ $('importSnapshotsInput').click(); }); $('importSnapshotsInput').addEventListener('change', function(e){ var f=e.target.files[0]; if(f) importSnapshotsJson(f); e.target.value=''; }); $('chartModeBtn').addEventListener('click', toggleChartMode); loadFromSharePoint(); }
